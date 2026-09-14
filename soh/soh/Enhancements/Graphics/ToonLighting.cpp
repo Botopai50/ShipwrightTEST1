@@ -786,10 +786,12 @@ static void OnToonFrameUpdate() {
         // five and is fitted on the CPU -- is in effect for the splits that arrive with them.
         {
             ShadowMapQuality quality = ShadowMapQualityDefaults();
-            quality.analyticEdge = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 0);
+            quality.analyticEdge = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"),
+                                                  SHADOW_MAP_DEFAULT_ANALYTIC_EDGE);
             quality.analyticEdgeWidth = CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdgeWidth"),
                                                      SHADOW_MAP_DEFAULT_ANALYTIC_EDGE_WIDTH);
-            quality.jitter = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 0);
+            quality.jitter =
+                CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), SHADOW_MAP_DEFAULT_JITTER);
             quality.jitterTaps =
                 CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.JitterTaps"), SHADOW_MAP_DEFAULT_JITTER_TAPS);
             quality.jitterRadius =

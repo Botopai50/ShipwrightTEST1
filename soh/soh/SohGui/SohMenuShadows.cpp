@@ -861,7 +861,7 @@ void SohMenu::AddMenuShadows() {
 
     auto hideUnlessAnalytic = [](WidgetInfo& info) {
         info.isHidden =
-            ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 0);
+            ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 1);
     };
 
     AddWidget(path, "Ativar Borda Analítica", WIDGET_CVAR_CHECKBOX)
@@ -896,7 +896,7 @@ void SohMenu::AddMenuShadows() {
     path = { "Sombras", "Borda", SECTION_COLUMN_1 };
 
     auto hideUnlessJitter = [](WidgetInfo& info) {
-        info.isHidden = ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 0);
+        info.isHidden = ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 1);
     };
 
     AddWidget(path, "Ativar Jitter", WIDGET_CVAR_CHECKBOX)

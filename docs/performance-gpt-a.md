@@ -19,7 +19,7 @@ Das três propostas da análise original, duas já estavam implementadas nesta b
    `initData` na API assíncrona.
 
 O submódulo aponta para o commit que contém a terceira alteração; a configuração de branch acompanha
-`Otimização_Foda_GPT.A` no repositório libultrashipTEST2.
+`main` no repositório libultrashipTEST1.
 
 ## Validação
 

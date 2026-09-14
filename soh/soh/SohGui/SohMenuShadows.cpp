@@ -11,8 +11,8 @@
 // z64.h with it. The capture's game_context needs exactly these four, and other menu files declare
 // gPlayState the same way. The spellings match variables.h exactly, so a change there fails to link here
 // rather than diverging quietly.
-extern PlayState* gPlayState;
 extern "C" {
+extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 extern const char gBuildVersion[];
 extern const char gGitBranch[];

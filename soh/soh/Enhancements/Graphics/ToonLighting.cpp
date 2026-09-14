@@ -234,8 +234,8 @@ static void RefreshFrameParams() {
     }
     sParams.suppressVanilla = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.WorldShadows.SuppressVanillaShadows"), 1) != 0;
     sParams.multipleLights = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ToonLighting.MultipleLights"), 1) != 0;
-    sParams.localIntensity = std::clamp(
-        CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ToonLighting.LocalIntensity"), 0.5f), 0.0f, 1.0f);
+    sParams.localIntensity =
+        std::clamp(CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ToonLighting.LocalIntensity"), 0.5f), 0.0f, 1.0f);
     sParams.useNaviLight = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ToonLighting.UseNaviLight"), 1) != 0;
     sParams.showDebug = CVarGetInteger(CVAR_DEVELOPER_TOOLS("ToonLighting.ShowDebug"), 0) != 0;
     sParams.shadowMapCensus =
@@ -1058,7 +1058,7 @@ static void EmitToonLocalLights(PlayState* play, Actor* actor, ToonKeyState& sta
                     break;
                 }
             }
-            Candidate candidate{info, score, attenuation, distance2};
+            Candidate candidate{ info, score, attenuation, distance2 };
             for (int i = 0; i < TOON_LOCAL_LIGHT_MAX; ++i) {
                 if (candidate.score > best[i].score) {
                     std::swap(candidate, best[i]);

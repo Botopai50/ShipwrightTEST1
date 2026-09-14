@@ -1,0 +1,10 @@
+[submodule "libultraship"]
+	path = libultraship
+	url = https://github.com/Botopai50/libultrashipTEST2.git
+	branch = Otimização_Foda_GPT.A
+[submodule "ZAPDTR"]
+	path = ZAPDTR
+	url = https://github.com/harbourmasters/ZAPDTR
+[submodule "OTRExporter"]
+	path = OTRExporter
+	url = https://github.com/harbourmasters/OTRExporter

@@ -1,0 +1,246 @@
+name: generate-builds
+# SOH [fork] Build on pushes to the default branch (warms the ccache/deps/vcpkg caches, since
+# those only `save` when github.ref_name == the default branch) and on release tags. Our tags follow
+# <SoH-version>-celshade<X.Y> (e.g. 9.2.3-celshade0.4), so match anything containing "celshade".
+# Release tags branch off the default branch and restore the branch-warmed caches.
+on:
+  # SOH [fork] Listen to every push, then let `generate-soh-otr` decide (see its `if:`). GitHub has
+  # no "default branch" token for push filters, so naming the branch here means renaming the default
+  # silently stops all builds. The job-level guard reads the default branch at run time instead.
+  push:
+  # SOH [fork] Manual runs from the Actions tab, on any branch or tag.
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+
+  generate-soh-otr:
+    # SOH [fork] Build the default branch (whatever it is currently named -- this warms the
+    # ccache/deps/vcpkg caches, which only `save` on the default branch), release tags, feature
+    # branches named below, and anything started by hand. Pushes to other branches skip instantly at
+    # zero cost. Every other job `needs:` this one, so they skip with it.
+    #
+    # The name substrings are the opt-in: a branch whose work is worth a build on every push says so
+    # by carrying one, and everything else stays free. `shadow` joins `celshade` because that work
+    # lands in the renderer's Windows-only depth pass -- the one part of it no other job compiles, so
+    # a push that is never built is a push that is never checked.
+    #
+    # `shadow` and not `shadowmap`, which is the narrower spelling this started as and which quietly
+    # did nothing for `shadow-map-...`. A branch doing exactly the work the substring was added for
+    # went unbuilt through a dozen pushes because of one hyphen, which is the failure the paragraph
+    # above warns about, arriving through the guard meant to prevent it. Matching the stem covers
+    # every spelling anyone reaches for.
+    #
+    # `performance` joins them for the same reason. That work is in the Fast3D interpreter and the
+    # backends, which only build-windows compiles here -- generate-soh-otr builds the asset target and
+    # never touches them. A renderer change on such a branch was reaching the remote having been read
+    # but never compiled by anything.
+    # `otimiza` is `performance` again, in the language the branches are actually named in. A branch
+    # doing renderer and resource-loading work was pushed six times and skipped six times, because the
+    # opt-in list was English-only while the person naming the branches was not. The substring is there
+    # to describe the WORK, and the work does not change language with the label on it.
+    #
+    # The stem again, per the `shadow` lesson above: `otimiza` covers otimizacao, otimização, otimizar
+    # and otimizada. `contains` is not case sensitive, so the capital O in a name like
+    # `Otimização_Foda` needs nothing extra.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.ref_name == github.event.repository.default_branch
+      || contains(github.ref, 'celshade')
+      || contains(github.ref, 'shadow')
+      || contains(github.ref, 'performance')
+      || contains(github.ref, 'otimiza')
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Git Checkout
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+    - name: Configure ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+      # SOH [fork] Saved on every branch this workflow actually builds, not only on the default one.
+      #
+      # Gating the save to the default branch means a feature branch restores whatever that branch last
+      # left behind, compiles everything that misses, and throws the result away -- so the misses are
+      # identical on every run and the cache never warms. Measured on this branch: 14.8 min of compile
+      # while its base still resembled the cache, then 42.8 min from the moment the base changed, with
+      # no recovery over a dozen runs. The log says it outright: "Not saving cache because 'save' is set
+      # to 'false'."
+      #
+      # The job only runs on branches that opted in at the gate above, so "every branch that builds" is
+      # already a small set. What it costs is cache storage: keys carry the sha, so each run writes a new
+      # entry and GitHub evicts by least-recent-use inside the repository's 10 GB. That can push out the
+      # default branch's entry -- which is the honest trade here, and it is one line to put back.
+        save: true
+        key: ${{ runner.os }}-otr-ccache-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-otr-ccache-${{ github.ref }}
+          ${{ runner.os }}-otr-ccache
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y $(cat .github/workflows/apt-deps.txt) libzip-dev zipcmp zipmerge ziptool
+    - name: Restore Cached deps folder
+      id: restore-cache-deps
+      uses: actions/cache/restore@v5
+      with:
+        key: ${{ runner.os }}-deps-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-deps-${{ github.ref }}-
+          ${{ runner.os }}-deps-
+        path: deps
+    - name: Create deps folder
+      run: mkdir -p deps
+    - name: Install latest SDL
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        if [ ! -d "deps/SDL2-2.30.3" ]; then
+          wget https://github.com/libsdl-org/SDL/releases/download/release-2.30.3/SDL2-2.30.3.tar.gz
+          tar -xzf SDL2-2.30.3.tar.gz -C deps
+        fi
+        cd deps/SDL2-2.30.3
+        ./configure --enable-hidapi-libusb
+        make -j 10
+        sudo make install
+        sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
+    - name: Install latest tinyxml2
+      run: |
+        sudo apt-get remove libtinyxml2-dev
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        if [ ! -d "deps/tinyxml2-10.0.0" ]; then
+          wget https://github.com/leethomason/tinyxml2/archive/refs/tags/10.0.0.tar.gz
+          tar -xzf 10.0.0.tar.gz -C deps
+        fi
+        cd deps/tinyxml2-10.0.0
+        mkdir -p build
+        cd build
+        cmake ..
+        make
+        sudo make install
+    - name: Generate soh.o2r
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release
+        cmake --build build-cmake --config Release --target GenerateSohOtr -j3
+    - name: Upload soh.o2r
+      uses: actions/upload-artifact@v7
+      with:
+        name: soh.o2r
+        path: soh.o2r
+        retention-days: 3
+    # SOH [fork] The deps cache used to be saved by build-linux, which this fork no longer runs.
+    # Without a save the restore above always misses and SDL/tinyxml2 get rebuilt from source every
+    # run, so save it here instead -- same default-branch gating as the vcpkg cache.
+    - name: Save Cache deps folder
+      # Same reasoning as the ccache save above. The cache-hit guard is because the key carries the sha:
+      # on a re-run of the same commit the restore is an exact hit and re-saving that key is an error.
+      if: steps.restore-cache-deps.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        key: ${{ steps.restore-cache-deps.outputs.cache-primary-key }}
+        path: deps
+
+  build-windows:
+    needs: generate-soh-otr
+    runs-on: windows-latest
+    steps:
+    - name: Install dependencies
+      run: |
+        choco install ninja -y
+        Remove-Item -Path "C:\ProgramData\Chocolatey\bin\ccache.exe" -Force -ErrorAction SilentlyContinue
+    - name: Git Checkout
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+    - name: Configure sccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        variant: sccache
+        max-size: "2G"
+        evict-old-files: job
+      # SOH [fork] Saved on every branch this workflow actually builds, not only on the default one.
+      #
+      # Gating the save to the default branch means a feature branch restores whatever that branch last
+      # left behind, compiles everything that misses, and throws the result away -- so the misses are
+      # identical on every run and the cache never warms. Measured on this branch: 14.8 min of compile
+      # while its base still resembled the cache, then 42.8 min from the moment the base changed, with
+      # no recovery over a dozen runs. The log says it outright: "Not saving cache because 'save' is set
+      # to 'false'."
+      #
+      # The job only runs on branches that opted in at the gate above, so "every branch that builds" is
+      # already a small set. What it costs is cache storage: keys carry the sha, so each run writes a new
+      # entry and GitHub evicts by least-recent-use inside the repository's 10 GB. That can push out the
+      # default branch's entry -- which is the honest trade here, and it is one line to put back.
+        save: true
+        key: ${{ runner.os }}-ccache-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-${{ github.ref }}
+          ${{ runner.os }}-ccache
+    - name: Restore Cached VCPKG folder
+      id: restore-cache-vcpkg
+      uses: actions/cache/restore@v5
+      with:
+        key: ${{ runner.os }}-vcpkg-${{ github.ref }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-${{ github.ref }}-
+          ${{ runner.os }}-vcpkg-
+        path: vcpkg
+    - name: Configure Developer Command Prompt
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Download soh.o2r
+      uses: actions/download-artifact@v7
+      with:
+        name: soh.o2r
+        path: build-windows/soh
+    - name: Build SoH
+      env:
+        VCPKG_ROOT: ${{github.workspace}}/vcpkg
+      run: |
+        set $env:PATH="$env:USERPROFILE/.cargo/bin;$env:PATH"
+        cmake -S . -B build-windows -G Ninja -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_REMOTE_CONTROL=1
+        cmake --build build-windows --config Release --parallel 10
+
+        (cd build-windows && cpack)
+        cd ..
+        mv _packages/*.zip _packages/soh-windows.zip
+    - name: Unzip package
+      run: Expand-Archive -Path _packages/soh-windows.zip -DestinationPath soh-windows
+    - name: Upload build
+      uses: actions/upload-artifact@v7
+      with:
+        name: soh-windows
+        path: soh-windows
+    - name: Save Cache VCPKG folder
+      # Same reasoning as the sccache save above, same exact-hit guard.
+      if: steps.restore-cache-vcpkg.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        key: ${{ steps.restore-cache-vcpkg.outputs.cache-primary-key }}
+        path: vcpkg
+
+  # Fork-only: publish a GitHub Release when a *celshade* tag is pushed.
+  release:
+    needs: build-windows
+    if: contains(github.ref, 'celshade')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+    - name: Download Windows build
+      uses: actions/download-artifact@v7
+      with:
+        name: soh-windows
+        path: rel/windows
+    - name: Package release assets
+      run: |
+        TAG="${GITHUB_REF_NAME}"
+        mkdir -p dist
+        (cd rel/windows && zip -r "../../dist/SoH-${TAG}-Win64.zip" .)
+    - name: Publish GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: "SoH (cel-shading fork) ${{ github.ref_name }}"
+        generate_release_notes: true
+        files: dist/*

@@ -811,10 +811,10 @@ void SohMenu::AddMenuShadows() {
                      .Format("%d"));
     AddWidget(path, "Salvar captura das sombras (DirectX)", WIDGET_BUTTON)
         .PreFunc(advOnly)
-        .Options(ButtonOptions().Tooltip(
-            "Salva as profundidades e configurações da camada do cenário em shadow-captures, "
-            "na pasta de dados do jogo. Pode causar uma pausa durante a leitura da GPU. "
-            "Clique com o defeito visível; não altera a aparência das sombras."))
+        .Options(
+            ButtonOptions().Tooltip("Salva as profundidades e configurações da camada do cenário em shadow-captures, "
+                                    "na pasta de dados do jogo. Pode causar uma pausa durante a leitura da GPU. "
+                                    "Clique com o defeito visível; não altera a aparência das sombras."))
         .Callback([](WidgetInfo& info) {
             CVarSetString(SHADOW_MAP_CAPTURE_STATUS_CVAR, "Aguardando um quadro com Shadow Map no DirectX...");
             // What produced the file, written BEFORE the request and from here rather than from a render

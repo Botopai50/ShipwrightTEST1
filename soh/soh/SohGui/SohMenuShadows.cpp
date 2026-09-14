@@ -129,7 +129,7 @@ static bool ShadowProfileMatch(const ShadowProfile& p) {
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.StaticCache"), 0) == p.staticCache &&
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 1) == p.analyticEdge &&
            fEq(CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdgeWidth"), 2.0f), p.analyticEdgeWidth) &&
-           CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 1) == p.jitter &&
+           CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 0) == p.jitter &&
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.JitterTaps"), 8) == p.jitterTaps &&
            fEq(CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ShadowQuality.JitterRadius"), 2.0f), p.jitterRadius) &&
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.EdgeHarden"), 0) == p.edgeHarden &&
@@ -896,14 +896,14 @@ void SohMenu::AddMenuShadows() {
     path = { "Sombras", "Borda", SECTION_COLUMN_1 };
 
     auto hideUnlessJitter = [](WidgetInfo& info) {
-        info.isHidden = ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 1);
+        info.isHidden = ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 0);
     };
 
     AddWidget(path, "Ativar Jitter", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"))
         .RaceDisable(false)
         .PreFunc(advOnly)
-        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
             "Espalha as amostras num disco girado por um ângulo diferente em cada pixel.\n\n"
             "O degrau não fica menor, mas pixels vizinhos param de pular no mesmo lugar, então a borda é "
             "lida como granulado em vez de escada.\n\n"

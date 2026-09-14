@@ -23,6 +23,7 @@ import numpy as np
 from .capture import Capture
 
 FAR = 65535
+SCENE_FAR = 16777215.0  # D24_UNORM
 
 
 @dataclass
@@ -35,6 +36,9 @@ class Surface:
     cascade: int
     shape: tuple[int, int]  # (height, width) of the slice it came from
     valid: np.ndarray  # (H, W) bool, which texels produced a point
+    # Set only by `scene`, where the capture's own matrix gives the exact clip w.
+    # Everywhere else the view depth is measured from a chosen eye instead.
+    view_depth: np.ndarray | None = None
 
 
 def unproject(capture: Capture, cascade: int, step: int = 1) -> Surface:
@@ -179,3 +183,62 @@ def plane(
         shape=(resolution, resolution),
         valid=np.ones((resolution, resolution), bool),
     )
+
+
+def scene(capture: Capture, step: int = 2) -> Surface:
+    """Unproject the CAMERA's depth buffer: the receiver, at last.
+
+    Every visible surface is in here, shadowed ones included, which is the whole
+    difference from `unproject` above -- that one can only ever return the
+    surface the light already sees, so almost nothing on it can be occluded.
+
+    The view depth is not measured from a guessed eye: the shader's `viewDepth`
+    is `input.position.w`, the clip w, and unprojecting through the inverse
+    yields world_h / clip.w, so the reciprocal of the fourth component IS that w.
+    Exact, and it costs nothing.
+    """
+    if capture.scene is None or capture.camera_view_proj is None:
+        raise ValueError(
+            f"{capture.directory} carries no receiver. It was taken by a build "
+            f"that writes only the caster layers; re-capture, or use the plane."
+        )
+    depth = capture.scene
+    height, width = depth.shape
+    inv = np.linalg.inv(capture.camera_view_proj)
+
+    ys = np.arange(0, height, step)
+    xs = np.arange(0, width, step)
+    grid_y, grid_x = np.meshgrid(ys, xs, indexing="ij")
+    raw = depth[grid_y, grid_x]
+
+    ndc = np.stack(
+        [
+            (grid_x + 0.5) / width * 2.0 - 1.0,
+            1.0 - (grid_y + 0.5) / height * 2.0,
+            raw.astype(np.float64) / SCENE_FAR,
+            np.ones(raw.shape),
+        ],
+        axis=-1,
+    )
+    homogeneous = ndc.reshape(-1, 4) @ inv
+    w = homogeneous[:, 3]
+    world = (homogeneous[:, :3] / w[:, None]).reshape(*raw.shape, 3)
+    view_depth = (1.0 / w).reshape(raw.shape)
+
+    valid = (raw < SCENE_FAR) & np.isfinite(world).all(axis=2) & (view_depth > 0)
+    normal = _normals(world, valid, capture.params.light_axis)
+    keep = valid & np.isfinite(normal).all(axis=2)
+    idx = np.flatnonzero(keep.ravel())
+
+    surface = Surface(
+        world=world.reshape(-1, 3)[idx],
+        normal=normal.reshape(-1, 3)[idx],
+        # The jitter hash is a function of the SCREEN coordinate, and here the
+        # samples are screen pixels, so this is the shader's own input.
+        texel=np.stack([grid_x.ravel()[idx], grid_y.ravel()[idx]], axis=1),
+        cascade=-2,
+        shape=raw.shape,
+        valid=keep,
+    )
+    surface.view_depth = view_depth.ravel()[idx]
+    return surface

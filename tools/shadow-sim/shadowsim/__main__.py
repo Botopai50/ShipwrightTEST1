@@ -11,7 +11,7 @@ import numpy as np
 from .capture import Capture, CaptureError
 from .render import (
     default_camera, default_eye, receivers, render_camera_view,
-    render_light_view, render_plane_view, to_image,
+    render_light_view, render_plane_view, render_scene_view, to_image,
 )
 
 CHANNELS = ("visibility", "coverage", "layers", "cascade", "normal", "depth")
@@ -92,6 +92,12 @@ def main(argv: list[str] | None = None) -> int:
     p_light.add_argument("--eye", type=str, default=None,
                          help="camera position 'x,y,z'; decides the cascade ladder")
 
+    p_scene = sub.add_parser("scene", parents=[common],
+                             help="shade the camera's own depth buffer: the frame as rendered")
+    p_scene.add_argument("--caster-shift", type=float, default=0.0, metavar="N",
+                         help="move each sample N world units along the light before "
+                              "projecting; a measuring instrument, not a shader input")
+
     p_plane = sub.add_parser("plane", parents=[common, ground],
                              help="shade a flat receiver: the cast shadow itself")
     p_plane.add_argument("--eye", type=str, default=None)
@@ -134,6 +140,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {len(shaded.coverage)} surface samples, {occluded:.1%} more than half occluded")
         for channel in channels:
             save(args.out / f"light-c{args.cascade}-{channel}.png", to_image(shaded, channel))
+        return 0
+
+    if args.command == "scene":
+        if capture.scene is None:
+            print("error: this capture carries no receiver -- "
+                  f"{capture.meta.get('camera_note') or 'taken by a build that wrote none'}",
+                  file=sys.stderr)
+            return 2
+        shaded = render_scene_view(capture, args.step, want_actors, args.caster_shift)
+        occluded = float((shaded.coverage < 0.5).mean())
+        print(f"  {len(shaded.coverage)} visible surface samples,"
+              f" {occluded:.1%} more than half occluded"
+              + (f"  (caster shift {args.caster_shift:+g})" if args.caster_shift else ""))
+        tag = f"{args.caster_shift:+g}" if args.caster_shift else "asis"
+        for channel in channels:
+            save(args.out / f"scene-{tag}-{channel}.png", to_image(shaded, channel))
         return 0
 
     if args.command == "plane":

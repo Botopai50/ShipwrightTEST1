@@ -26,7 +26,7 @@ import numpy as np
 
 from . import kernel
 from .capture import Capture
-from .reconstruct import Surface, plane, unproject
+from .reconstruct import Surface, plane, scene, unproject
 
 
 @dataclass
@@ -64,7 +64,14 @@ def shade_surface(
     """Run the receiver kernel over every point of a reconstructed surface."""
     p = capture.params
     world = surface.world
-    view_depth = np.linalg.norm(world - eye, axis=1)
+    # The scene receiver carries the frame's own clip w. Measuring from an eye
+    # instead would be a guess at a number the capture already states exactly,
+    # and the cascade ladder is chosen from it.
+    view_depth = (
+        surface.view_depth
+        if surface.view_depth is not None
+        else np.linalg.norm(world - eye, axis=1)
+    )
     # The jitter hash is a function of the pixel coordinate, so the sample's own
     # grid position is what it must be fed: feeding an index would correlate the
     # rotation with memory order and print the pattern along rows.
@@ -138,6 +145,26 @@ def render_light_view(
 ) -> Shaded:
     surface = unproject(capture, cascade, step=step)
     return shade_surface(capture, surface, default_eye(capture) if eye is None else eye, want_actors)
+
+
+def render_scene_view(
+    capture: Capture,
+    step: int = 2,
+    want_actors: bool = True,
+    caster_shift: float = 0.0,
+) -> Shaded:
+    """Shade the camera's own depth buffer: the frame as it was rendered.
+
+    `caster_shift` moves every sample along the light before it is projected,
+    in world units. It is NOT part of the shader and is a measuring instrument:
+    a capture whose stored casters sit at a constant offset from the surfaces
+    they were rasterised from shows it as a uniform occlusion, and dialling this
+    until that clears reads the offset off directly.
+    """
+    surface = scene(capture, step=step)
+    if caster_shift:
+        surface.world = surface.world + capture.params.light_axis * caster_shift
+    return shade_surface(capture, surface, np.zeros(3), want_actors)
 
 
 def render_plane_view(

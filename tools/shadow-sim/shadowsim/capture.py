@@ -86,6 +86,8 @@ class Capture:
     world: np.ndarray  # (slices, h, w) uint16
     actors: np.ndarray | None
     params: ShadowParams
+    scene: np.ndarray | None = None  # (h, w) uint32, the camera's depth buffer
+    camera_view_proj: np.ndarray | None = None  # (4, 4) row-major, row-vector
 
     @classmethod
     def load(cls, directory: str | Path) -> "Capture":
@@ -108,6 +110,23 @@ class Capture:
         actor_layer = meta.get("actor_layer")
         if actor_layer:
             actors = sds.load(directory / actor_layer)
+
+        # The receiver, present only in captures taken by a build that writes one.
+        # Its absence is not an error -- it is what every earlier capture looks
+        # like -- so it is reported by `describe` and left None here.
+        scene = None
+        camera_view_proj = None
+        camera_layer = meta.get("camera_layer")
+        if camera_layer and (directory / camera_layer).is_file():
+            scene = sds.load_scene(directory / camera_layer)
+            matrix = meta.get("camera_view_proj")
+            if matrix is None or len(matrix) != 16:
+                raise CaptureError(
+                    f"{directory}: {camera_layer} is present but camera_view_proj is not. "
+                    f"A depth buffer is only a set of world positions once there is a "
+                    f"matrix to unproject it through."
+                )
+            camera_view_proj = np.asarray(matrix, np.float64).reshape(4, 4)
 
         matrices = meta.get("slice_matrices") or []
         if not matrices:
@@ -143,7 +162,7 @@ class Capture:
                 f"{directory}: world.sds holds {world.shape[0]} slices, "
                 f"fewer than the {count} cascades the frame used"
             )
-        return cls(directory, meta, world, actors, params)
+        return cls(directory, meta, world, actors, params, scene, camera_view_proj)
 
     @property
     def resolution(self) -> tuple[int, int]:
@@ -167,6 +186,17 @@ class Capture:
             f"  harden  on={p.harden[0] > 0.5} hardness={p.harden[1]:g} threshold={p.harden[2]:g}",
             f"  darkness {p.params[3]:g}   fade band {p.params[1]:g}",
         ]
+        if self.scene is not None:
+            h, w = self.scene.shape
+            lines.append(
+                f"  receiver {w}x{h} scene depth"
+                f"  (framebuffer {self.meta.get('camera_framebuffer')},"
+                f" {self.meta.get('camera_draws')} depth-writing draws,"
+                f" msaa {self.meta.get('camera_msaa')})"
+            )
+        else:
+            why = self.meta.get("camera_note") or "this build wrote no receiver"
+            lines.append(f"  receiver none -- {why}")
         if ctx:
             lines.append("  context " + ", ".join(f"{k}={v}" for k, v in sorted(ctx.items())))
         return "\n".join(lines)

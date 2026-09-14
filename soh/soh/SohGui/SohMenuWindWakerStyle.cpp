@@ -104,8 +104,8 @@ void SohMenu::AddMenuWindWakerStyle() {
         .CVar(CVAR_ENHANCEMENT("Graphics.ToonLighting.LocalIntensity"))
         .RaceDisable(false)
         .PreFunc(hideUnlessCelEnabled)
-        .Options(FloatSliderOptions().Min(0.0f).Max(1.0f).DefaultValue(0.5f).IsPercentage()
-            .Tooltip("Strength of additional toon lights. Lower this if overlapping sources wash out colors."));
+        .Options(FloatSliderOptions().Min(0.0f).Max(1.0f).DefaultValue(0.5f).IsPercentage().Tooltip(
+            "Strength of additional toon lights. Lower this if overlapping sources wash out colors."));
     AddWidget(path, "Point Light Range", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar(CVAR_ENHANCEMENT("Graphics.ToonLighting.PointLightRange"))
         .RaceDisable(false)

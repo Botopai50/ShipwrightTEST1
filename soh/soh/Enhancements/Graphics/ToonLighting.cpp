@@ -234,8 +234,8 @@ static void RefreshFrameParams() {
     }
     sParams.suppressVanilla = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.WorldShadows.SuppressVanillaShadows"), 1) != 0;
     sParams.multipleLights = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ToonLighting.MultipleLights"), 1) != 0;
-    sParams.localIntensity = std::clamp(
-        CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ToonLighting.LocalIntensity"), 0.5f), 0.0f, 1.0f);
+    sParams.localIntensity =
+        std::clamp(CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ToonLighting.LocalIntensity"), 0.5f), 0.0f, 1.0f);
     sParams.useNaviLight = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ToonLighting.UseNaviLight"), 1) != 0;
     sParams.showDebug = CVarGetInteger(CVAR_DEVELOPER_TOOLS("ToonLighting.ShowDebug"), 0) != 0;
     sParams.shadowMapCensus =
@@ -786,10 +786,12 @@ static void OnToonFrameUpdate() {
         // five and is fitted on the CPU -- is in effect for the splits that arrive with them.
         {
             ShadowMapQuality quality = ShadowMapQualityDefaults();
-            quality.analyticEdge = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 0);
+            quality.analyticEdge = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"),
+                                                  SHADOW_MAP_DEFAULT_ANALYTIC_EDGE);
             quality.analyticEdgeWidth = CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdgeWidth"),
                                                      SHADOW_MAP_DEFAULT_ANALYTIC_EDGE_WIDTH);
-            quality.jitter = CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 0);
+            quality.jitter =
+                CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), SHADOW_MAP_DEFAULT_JITTER);
             quality.jitterTaps =
                 CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.JitterTaps"), SHADOW_MAP_DEFAULT_JITTER_TAPS);
             quality.jitterRadius =
@@ -1058,7 +1060,7 @@ static void EmitToonLocalLights(PlayState* play, Actor* actor, ToonKeyState& sta
                     break;
                 }
             }
-            Candidate candidate{info, score, attenuation, distance2};
+            Candidate candidate{ info, score, attenuation, distance2 };
             for (int i = 0; i < TOON_LOCAL_LIGHT_MAX; ++i) {
                 if (candidate.score > best[i].score) {
                     std::swap(candidate, best[i]);

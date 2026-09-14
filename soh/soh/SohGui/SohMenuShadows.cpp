@@ -11,8 +11,8 @@
 // z64.h with it. The capture's game_context needs exactly these four, and other menu files declare
 // gPlayState the same way. The spellings match variables.h exactly, so a change there fails to link here
 // rather than diverging quietly.
-extern PlayState* gPlayState;
 extern "C" {
+extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 extern const char gBuildVersion[];
 extern const char gGitBranch[];
@@ -129,7 +129,7 @@ static bool ShadowProfileMatch(const ShadowProfile& p) {
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.StaticCache"), 0) == p.staticCache &&
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 1) == p.analyticEdge &&
            fEq(CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdgeWidth"), 2.0f), p.analyticEdgeWidth) &&
-           CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 1) == p.jitter &&
+           CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"), 0) == p.jitter &&
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.JitterTaps"), 8) == p.jitterTaps &&
            fEq(CVarGetFloat(CVAR_ENHANCEMENT("Graphics.ShadowQuality.JitterRadius"), 2.0f), p.jitterRadius) &&
            CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.EdgeHarden"), 0) == p.edgeHarden &&
@@ -811,10 +811,10 @@ void SohMenu::AddMenuShadows() {
                      .Format("%d"));
     AddWidget(path, "Salvar captura das sombras (DirectX)", WIDGET_BUTTON)
         .PreFunc(advOnly)
-        .Options(ButtonOptions().Tooltip(
-            "Salva as profundidades e configurações da camada do cenário em shadow-captures, "
-            "na pasta de dados do jogo. Pode causar uma pausa durante a leitura da GPU. "
-            "Clique com o defeito visível; não altera a aparência das sombras."))
+        .Options(
+            ButtonOptions().Tooltip("Salva as profundidades e configurações da camada do cenário em shadow-captures, "
+                                    "na pasta de dados do jogo. Pode causar uma pausa durante a leitura da GPU. "
+                                    "Clique com o defeito visível; não altera a aparência das sombras."))
         .Callback([](WidgetInfo& info) {
             CVarSetString(SHADOW_MAP_CAPTURE_STATUS_CVAR, "Aguardando um quadro com Shadow Map no DirectX...");
             // What produced the file, written BEFORE the request and from here rather than from a render
@@ -861,7 +861,7 @@ void SohMenu::AddMenuShadows() {
 
     auto hideUnlessAnalytic = [](WidgetInfo& info) {
         info.isHidden =
-            ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 0);
+            ShadowAdvancedOff() || !CVarGetInteger(CVAR_ENHANCEMENT("Graphics.ShadowQuality.AnalyticEdge"), 1);
     };
 
     AddWidget(path, "Ativar Borda Analítica", WIDGET_CVAR_CHECKBOX)
@@ -903,7 +903,7 @@ void SohMenu::AddMenuShadows() {
         .CVar(CVAR_ENHANCEMENT("Graphics.ShadowQuality.Jitter"))
         .RaceDisable(false)
         .PreFunc(advOnly)
-        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
             "Espalha as amostras num disco girado por um ângulo diferente em cada pixel.\n\n"
             "O degrau não fica menor, mas pixels vizinhos param de pular no mesmo lugar, então a borda é "
             "lida como granulado em vez de escada.\n\n"
